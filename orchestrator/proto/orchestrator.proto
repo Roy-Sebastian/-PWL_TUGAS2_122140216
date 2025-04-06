@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package orchestrator;
+
+option go_package = "github.com/roybas/orchestrator/proto";
+
+service OrchestratorService {
+  rpc StartSaga (StartSagaRequest) returns (StartSagaResponse);
+}
+
+message StartSagaRequest {
+  string order_id = 1;
+}
+
+message StartSagaResponse {
+  bool success = 1;
+  string message = 2;
+}

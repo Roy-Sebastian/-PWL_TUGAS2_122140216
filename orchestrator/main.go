@@ -25,7 +25,7 @@ func main() {
 	// Connect to Order Service
 	orderConn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
 	if err != nil {
-		log.WithError(err).Fatal("Failed to connect to order service")
+		log.WithError(err).Fatal("❌ Failed to connect to order service")
 	}
 	defer orderConn.Close()
 	orderClient := orderpb.NewOrderServiceClient(orderConn)
@@ -33,7 +33,7 @@ func main() {
 	// Connect to Payment Service
 	paymentConn, err := grpc.Dial("localhost:50052", grpc.WithInsecure())
 	if err != nil {
-		log.WithError(err).Fatal("Failed to connect to payment service")
+		log.WithError(err).Fatal("❌ Failed to connect to payment service")
 	}
 	defer paymentConn.Close()
 	paymentClient := paymentpb.NewPaymentServiceClient(paymentConn)
@@ -41,38 +41,53 @@ func main() {
 	// Connect to Shipping Service
 	shippingConn, err := grpc.Dial("localhost:50053", grpc.WithInsecure())
 	if err != nil {
-		log.WithError(err).Fatal("Failed to connect to shipping service")
+		log.WithError(err).Fatal("❌ Failed to connect to shipping service")
 	}
 	defer shippingConn.Close()
 	shippingClient := shippingpb.NewShippingServiceClient(shippingConn)
 
 	// START SAGA
 	orderID := "12345"
-	log.WithField("order_id", orderID).Info("Starting SAGA transaction")
+	log.WithField("order_id", orderID).Info("🚀 Starting SAGA transaction")
 
 	// 1. Create Order
 	_, err = orderClient.CreateOrder(ctx, &orderpb.CreateOrderRequest{OrderId: orderID})
 	if err != nil {
-		log.WithError(err).Fatal("Failed to create order")
+		log.WithError(err).Fatal("❌ Failed to create order")
 	}
-	log.WithField("order_id", orderID).Info("Order created successfully")
+	log.WithField("order_id", orderID).Info("✅ Order created successfully")
 
 	// 2. Process Payment
 	_, err = paymentClient.ProcessPayment(ctx, &paymentpb.ProcessPaymentRequest{OrderId: orderID})
 	if err != nil {
-		log.WithError(err).Warn("Payment failed. Starting compensation...")
+		log.WithFields(logrus.Fields{
+			"order_id": orderID,
+			"error":    err,
+		}).Warn("❌ Payment failed. Starting compensation...")
+
+		// Cancel Order (karena payment gagal)
 		_, cancelErr := orderClient.CancelOrder(ctx, &orderpb.CancelOrderRequest{OrderId: orderID})
 		if cancelErr != nil {
-			log.WithError(cancelErr).Error("Failed to cancel order")
+			log.WithFields(logrus.Fields{
+				"order_id": orderID,
+				"error":    cancelErr,
+			}).Error("❌ Failed to cancel order during compensation")
+		} else {
+			log.WithFields(logrus.Fields{
+				"order_id": orderID,
+				"status":   "compensated",
+				"step":     "payment",
+			}).Info("✅ Order cancelled successfully as part of payment compensation")
 		}
+
 		return
 	}
-	log.WithField("order_id", orderID).Info("Payment processed successfully")
+	log.WithField("order_id", orderID).Info("✅ Payment processed successfully")
 
 	// 3. Start Shipping
 	_, err = shippingClient.StartShipping(ctx, &shippingpb.StartShippingRequest{OrderId: orderID})
 	if err != nil {
-		log.WithError(err).Warn("Shipping failed. Starting compensation...")
+		log.WithError(err).Warn("❌ Shipping failed. Starting compensation...")
 
 		// Cancel Shipping
 		_, cancelErr := shippingClient.CancelShipping(ctx, &shippingpb.CancelShippingRequest{OrderId: orderID})
@@ -80,9 +95,9 @@ func main() {
 			log.WithFields(logrus.Fields{
 				"order_id": orderID,
 				"error":    cancelErr,
-			}).Error("Failed to cancel shipping")
+			}).Error("❌ Failed to cancel shipping")
 		} else {
-			log.WithField("order_id", orderID).Info("Shipping cancelled successfully")
+			log.WithField("order_id", orderID).Info("✅ Shipping cancelled successfully")
 		}
 
 		// Refund Payment
@@ -91,9 +106,9 @@ func main() {
 			log.WithFields(logrus.Fields{
 				"order_id": orderID,
 				"error":    refundErr,
-			}).Error("Failed to refund payment")
+			}).Error("❌ Failed to refund payment")
 		} else {
-			log.WithField("order_id", orderID).Info("Payment refunded successfully")
+			log.WithField("order_id", orderID).Info("✅ Payment refunded successfully")
 		}
 
 		// Cancel Order
@@ -102,14 +117,14 @@ func main() {
 			log.WithFields(logrus.Fields{
 				"order_id": orderID,
 				"error":    cancelOrderErr,
-			}).Error("Failed to cancel order")
+			}).Error("❌ Failed to cancel order")
 		} else {
-			log.WithField("order_id", orderID).Info("Order cancelled successfully")
+			log.WithField("order_id", orderID).Info("✅ Order cancelled successfully")
 		}
 
 		return
 	}
-	log.WithField("order_id", orderID).Info("Shipping started successfully")
+	log.WithField("order_id", orderID).Info("✅ Shipping started successfully")
 
-	log.WithField("order_id", orderID).Info("SAGA completed successfully")
+	log.WithField("order_id", orderID).Info("🎉 SAGA completed successfully")
 }

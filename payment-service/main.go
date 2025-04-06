@@ -16,7 +16,11 @@ type server struct {
 }
 
 func (s *server) ProcessPayment(ctx context.Context, req *pb.ProcessPaymentRequest) (*pb.ProcessPaymentResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+	fmt.Println("Payment processed for Order ID:", req.OrderId)
+	return &pb.ProcessPaymentResponse{
+		Success: true,
+		Message: "Payment successful",
+	}, nil
 }
 
 func (s *server) RefundPayment(ctx context.Context, req *pb.RefundPaymentRequest) (*pb.RefundPaymentResponse, error) {
